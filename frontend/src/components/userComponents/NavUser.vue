@@ -47,7 +47,7 @@
               name="search"
               id="search"
               autocomplete="off"
-              placeholder="Tìm kiếm"
+              placeholder="Tìm kiếm sách"
               class="form-control"
               v-model="searchQuery"
             />
@@ -59,7 +59,7 @@
         <ul class="list-group list-book__search" v-if="books.length > 0">
           <router-link
             v-for="item in books"
-            :to="`/${item._id}`"
+            :to="`/book/${item._id}`"
             class="list-group-item list-group-item-action"
             :key="item._id"
           >
@@ -72,7 +72,7 @@
 </template>
 
 <script>
-import bookService from "../../services/book.service";
+import bookService from "../../services/book.service"; // Import bookService
 
 export default {
   data() {
@@ -95,16 +95,14 @@ export default {
       try {
         if (this.searchQuery.trim()) {
           const result = await bookService.searchBooks(this.searchQuery);
-          // Lưu kết quả tìm kiếm vào localStorage
+          // Lưu kết quả tìm kiếm vào localStorage (nếu cần)
           localStorage.setItem(
             "searchResults",
             JSON.stringify(result.books || [])
           );
-          this.books = result.books || [];
-          // Điều hướng về trang chủ sau khi tìm kiếm
-          this.$router.push({ name: "" });
+          this.books = result.books || []; // Cập nhật danh sách sách tìm được
         } else {
-          this.books = []; // Nếu không có từ khóa tìm kiếm, xóa danh sách kết quả
+          this.books = []; // Xóa kết quả khi không có từ khóa tìm kiếm
         }
       } catch (error) {
         console.error("Lỗi khi tìm kiếm sách:", error);
@@ -113,6 +111,7 @@ export default {
   },
 };
 </script>
+
 <style scoped>
 .search-group {
   justify-content: center;

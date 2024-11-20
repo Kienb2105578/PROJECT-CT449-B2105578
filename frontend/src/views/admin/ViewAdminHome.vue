@@ -12,13 +12,19 @@
         >
           <h3 class="title-admin">Thông tin sách</h3>
         </div>
-        <div>
-          <button
-            class="btn btn-outline-primary m-2 add-button"
-            @click="navigateToCreateBook"
-          >
-            Thêm mới
-          </button>
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <button
+              class="btn btn-outline-primary m-2 add-button"
+              @click="navigateToCreateBook"
+            >
+              Thêm mới
+            </button>
+          </div>
+
+          <div class="col-md-6">
+            <InputSearch v-model="searchText" />
+          </div>
         </div>
         <table class="table table-hover">
           <thead>
@@ -32,8 +38,10 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(item, index) in books" :key="item._id">
-              <th scope="row">{{ index + 1 }}</th>
+            <tr v-for="(item, index) in paginatedBooks" :key="item._id">
+              <th scope="row">
+                {{ index + 1 + (currentPage - 1) * itemsPerPage }}
+              </th>
               <td>{{ item.name }}</td>
               <td>{{ item.author }}</td>
               <td>{{ getPublisherName(item.publisher) }}</td>
@@ -54,31 +62,94 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- Phân trang -->
+        <div class="d-flex justify-content-center">
+          <nav>
+            <ul class="pagination">
+              <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                <a
+                  class="page-link"
+                  href="#"
+                  @click="changePage(currentPage - 1)"
+                >
+                  &laquo;
+                </a>
+              </li>
+              <li
+                class="page-item"
+                v-for="page in totalPages"
+                :key="page"
+                :class="{ active: page === currentPage }"
+              >
+                <a class="page-link" href="#" @click="changePage(page)">{{
+                  page
+                }}</a>
+              </li>
+              <li
+                class="page-item"
+                :class="{ disabled: currentPage === totalPages }"
+              >
+                <a
+                  class="page-link"
+                  href="#"
+                  @click="changePage(currentPage + 1)"
+                >
+                  &raquo;
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import InputSearch from "../../components/adminComponents/InputSearch.vue";
 import SidebarNav from "../../components/adminComponents/SidebarNav.vue";
 import bookService from "../../services/book.service";
-import publisherService from "../../services/publisher.service"; // Giả sử bạn có service này
+import publisherService from "../../services/publisher.service";
 
 export default {
   components: {
     SidebarNav,
+    InputSearch,
   },
   data() {
     return {
       books: [],
-      publishers: [], // Mảng lưu thông tin nhà xuất bản
+      publishers: [],
+      searchText: "", // Giá trị dùng để tìm kiếm
+      currentPage: 1, // Trang hiện tại
+      itemsPerPage: 5, // Số lượng sách mỗi trang
     };
+  },
+  computed: {
+    filteredBooks() {
+      if (!this.searchText) return this.books;
+      const search = this.searchText.toLowerCase();
+      return this.books.filter(
+        (book) =>
+          book.name.toLowerCase().includes(search) ||
+          book.author.toLowerCase().includes(search) ||
+          this.getPublisherName(book.publisher).toLowerCase().includes(search)
+      );
+    },
+    paginatedBooks() {
+      const start = (this.currentPage - 1) * this.itemsPerPage;
+      const end = this.currentPage * this.itemsPerPage;
+      return this.filteredBooks.slice(start, end);
+    },
+    totalPages() {
+      return Math.ceil(this.filteredBooks.length / this.itemsPerPage);
+    },
   },
   methods: {
     async getAll() {
       try {
         this.books = await bookService.getAll();
-        // Lấy danh sách nhà xuất bản
         this.publishers = await publisherService.getAll();
       } catch (error) {
         console.log(error);
@@ -101,6 +172,10 @@ export default {
     getPublisherName(publisherId) {
       const publisher = this.publishers.find((p) => p._id === publisherId);
       return publisher ? publisher.name : "Chưa xác định";
+    },
+    changePage(page) {
+      if (page < 1 || page > this.totalPages) return;
+      this.currentPage = page;
     },
   },
   mounted() {

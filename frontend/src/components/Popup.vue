@@ -2,11 +2,11 @@
 <template>
   <div v-if="showPopup" class="popup-overlay">
     <div class="popup-content">
-      <h3>Thông báo</h3>
+      <h3 class="text-primary">Thông báo</h3>
       <p>{{ popupMessage }}</p>
       <button
         class="btn btn-outline-primary"
-        style="border-radius: 20px; width: 50%"
+        style="border-radius: 20px; width: 50%; border: 1px solid #007bff"
         @click="closePopup"
       >
         Đóng

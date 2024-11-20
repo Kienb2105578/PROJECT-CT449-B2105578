@@ -27,6 +27,10 @@ class BorrowBookService {
   async getById(id) {
     return (await this.api.get("/" + id)).data;
   }
+  async getByUserAndBookId(reader_id, book_id) {
+    const query = `reader_id=${reader_id}&book_id=${book_id}`;
+    return (await this.api.get(`/?${query}`)).data;
+  }
 }
 
 export default new BorrowBookService();

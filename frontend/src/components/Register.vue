@@ -123,6 +123,66 @@
     </div>
   </div>
 </template>
+
+<script>
+import * as yup from "yup";
+import { Form, Field, ErrorMessage } from "vee-validate";
+
+export default {
+  components: {
+    Form,
+    Field,
+    ErrorMessage,
+  },
+  emits: ["submit:register"],
+  data() {
+    const registerFormSchema = yup.object().shape({
+      email: yup
+        .string()
+        .email("E-mail không đúng.")
+        .max(50, "E-mail tối đa 50 ký tự."),
+      password: yup.string().min(6, "Mật khẩu phải từ 6 kí tự"),
+      confirm_password: yup
+        .string()
+        .oneOf([yup.ref("password")], "Mật khẩu xác nhận không trùng khớp"),
+      dateOfBirth: yup
+        .date()
+        .transform((originalValue, originalObject) => {
+          return originalValue === "" ? new Date() : originalValue;
+        })
+        .required("Vui lòng chọn ngày sinh"),
+      gender: yup.string().required("Vui lòng chọn giới tính"),
+      phone: yup
+        .string()
+        .matches(/^[0-9]+$/, "Số điện thoại không hợp lệ")
+        .min(10, "Số điện thoại phải có ít nhất 10 chữ số"),
+      address: yup.string().required("Vui lòng nhập địa chỉ"),
+    });
+    return {
+      registerLocal: {
+        username: "",
+        email: "",
+        password: "",
+        confirm_password: "",
+        dateOfBirth: new Date().toISOString().split("T")[0],
+        gender: "",
+        phone: "",
+        address: "",
+      },
+      registerFormSchema,
+    };
+  },
+  methods: {
+    submitRegister() {
+      this.$emit("submit:register", this.registerLocal);
+    },
+    backLogin() {
+      this.$router.push({ name: "login" });
+    },
+  },
+};
+</script>
+
 <style scoped>
 .login-body {
   width: 814px;
@@ -237,62 +297,3 @@
   flex: 1;
 }
 </style>
-
-<script>
-import * as yup from "yup";
-import { Form, Field, ErrorMessage } from "vee-validate";
-
-export default {
-  components: {
-    Form,
-    Field,
-    ErrorMessage,
-  },
-  emits: ["submit:register"],
-  data() {
-    const registerFormSchema = yup.object().shape({
-      email: yup
-        .string()
-        .email("E-mail không đúng.")
-        .max(50, "E-mail tối đa 50 ký tự."),
-      password: yup.string().min(6, "Mật khẩu phải từ 6 kí tự"),
-      confirm_password: yup
-        .string()
-        .oneOf([yup.ref("password")], "Mật khẩu xác nhận không trùng khớp"),
-      dateOfBirth: yup
-        .date()
-        .transform((originalValue, originalObject) => {
-          return originalValue === "" ? new Date() : originalValue;
-        })
-        .required("Vui lòng chọn ngày sinh"),
-      gender: yup.string().required("Vui lòng chọn giới tính"),
-      phone: yup
-        .string()
-        .matches(/^[0-9]+$/, "Số điện thoại không hợp lệ")
-        .min(10, "Số điện thoại phải có ít nhất 10 chữ số"),
-      address: yup.string().required("Vui lòng nhập địa chỉ"),
-    });
-    return {
-      registerLocal: {
-        username: "",
-        email: "",
-        password: "",
-        confirm_password: "",
-        dateOfBirth: new Date().toISOString().split("T")[0],
-        gender: "",
-        phone: "",
-        address: "",
-      },
-      registerFormSchema,
-    };
-  },
-  methods: {
-    submitRegister() {
-      this.$emit("submit:register", this.registerLocal);
-    },
-    backLogin() {
-      this.$router.push({ name: "login" });
-    },
-  },
-};
-</script>

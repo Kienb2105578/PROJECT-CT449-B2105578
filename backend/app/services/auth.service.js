@@ -1,3 +1,4 @@
+const bcrypt = require("bcryptjs");
 const { ObjectId } = require("mongodb");
 
 class AuthService {
@@ -16,21 +17,27 @@ class AuthService {
    * DIENTHOAI
    */
 
+  // Đăng nhập
   async login(data) {
     const user = await this.col.findOne({
       email: data.email,
     });
 
     if (!user) {
-      return null;
+      return "User not found";
     }
 
-    if (user.password !== data.password) {
+    // So sánh mật khẩu đã mã hóa
+    const isMatch = await bcrypt.compare(data.password, user.password);
+
+    if (!isMatch) {
       return "Invalid password";
     }
 
     return user;
   }
+
+  // Đăng ký
   async register(data) {
     const user = await this.col.findOne({
       email: data.email,
@@ -40,10 +47,13 @@ class AuthService {
       return "User already exists";
     }
 
+    // Mã hóa mật khẩu trước khi lưu
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
     const insertUser = await this.col.insertOne({
       email: data.email,
       username: data.username,
-      password: data.password,
+      password: hashedPassword,
       dateOfBirth: data.dateOfBirth, // Ngày sinh (theo kiểu ISO string)
       gender: data.gender || "male", // Giới tính (mặc định là male)
       phone: data.phone || "", // Điện thoại (mặc định rỗng)
@@ -51,9 +61,10 @@ class AuthService {
     });
 
     if (!insertUser?.acknowledged) {
-      return "An error ocurred";
+      return "An error occurred";
     }
 
+    // Lấy lại thông tin người dùng sau khi đã lưu vào CSDL
     const result = await this.col.findOne({
       _id: insertUser.insertedId,
     });

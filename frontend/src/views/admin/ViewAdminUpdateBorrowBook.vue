@@ -7,7 +7,6 @@
         <div class="details row">
           <!-- Thông tin sách và người mượn -->
           <div class="col-md-6">
-            <!-- Thông tin người mượn -->
             <div class="info-section mb-4" v-if="reader">
               <h4>Thông tin người mượn</h4>
               <div class="info-row">
@@ -24,7 +23,6 @@
               </div>
             </div>
 
-            <!-- Thông tin sách -->
             <div class="info-section" v-if="book">
               <h4>Thông tin sách</h4>
               <div class="info-row">
@@ -54,7 +52,11 @@
               <div class="info-row">
                 <div class="info-label"><strong>Trạng thái:</strong></div>
                 <div class="info-value">
-                  <select v-model="borrowBook.status" @change="updateStatus">
+                  <select
+                    class="choser"
+                    v-model="borrowBook.status"
+                    @change="updateStatus"
+                  >
                     <option value="Chờ Xác Nhận">Chờ Xác Nhận</option>
                     <option value="Đã Xác Nhận">Đã Xác Nhận</option>
                     <option value="Đang Mượn">Đang Mượn</option>
@@ -76,42 +78,46 @@
       </div>
       <p v-else>Không tìm thấy thông tin mượn sách</p>
     </div>
+
+    <Popup
+      :showPopup="showPopup"
+      :popupMessage="popupMessage"
+      @close-popup="closePopup"
+    />
   </div>
 </template>
-
 <script>
 import SidebarNav from "../../components/adminComponents/SidebarNav.vue";
 import borrowBookService from "../../services/borrowBook.service";
 import bookService from "../../services/book.service";
 import readerService from "../../services/reader.service";
-import emailService from "../../services/email.service"; // Giả sử bạn đã có một service gửi email
+import emailService from "../../services/email.service";
+import Popup from "../../components/Popup.vue";
 
 export default {
   components: {
     SidebarNav,
+    Popup,
   },
   data() {
     return {
       loading: true,
-      borrowBook: {}, // Dữ liệu mượn sách
-      book: null, // Chi tiết sách
-      reader: null, // Chi tiết người mượn
+      borrowBook: {},
+      book: null,
+      reader: null,
+      showPopup: false,
+      popupMessage: "",
     };
   },
   async created() {
-    await this.showBorrowBook();
+    await this.fetchBorrowBookData();
   },
   methods: {
-    async showBorrowBook() {
+    async fetchBorrowBookData() {
       try {
         const id = this.$route.params.id;
-        // Lấy dữ liệu mượn sách
         this.borrowBook = await borrowBookService.getById(id);
-
-        // Lấy chi tiết sách dựa trên book_id
         this.book = await bookService.getById(this.borrowBook.book_id);
-
-        // Lấy chi tiết người mượn dựa trên reader_id
         this.reader = await readerService.getById(this.borrowBook.reader_id);
       } catch (error) {
         console.error("Lỗi khi lấy dữ liệu chi tiết:", error);
@@ -119,43 +125,65 @@ export default {
         this.loading = false;
       }
     },
-    async updateStatus() {
+    canChangeStatus(currentStatus, newStatus) {
+      const validTransitions = {
+        "Chờ Xác Nhận": ["Đã Xác Nhận", "Đã Hủy"],
+        "Đã Xác Nhận": ["Đang Mượn", "Đã Hủy"],
+        "Đang Mượn": ["Đã Trả"],
+        "Đã Trả": [],
+        "Đã Hủy": [],
+      };
+
+      console.log(
+        "Kiểm tra sự chuyển đổi trạng thái: ",
+        currentStatus,
+        " -> ",
+        newStatus
+      );
+
+      // Kiểm tra sự chuyển đổi hợp lệ từ trạng thái hiện tại sang trạng thái mới
+      return validTransitions[currentStatus]?.includes(newStatus);
+    },
+
+    async updateStatus(event) {
       try {
-        const { _id, status } = this.borrowBook;
+        const id = this.$route.params.id;
+        this.borrowBook = await borrowBookService.getById(id);
 
-        // Cập nhật trạng thái mượn sách
-        await borrowBookService.updateStatus(_id, { status });
-        // Kiểm tra nếu trạng thái được cập nhật từ "Chờ Xác Nhận" => "Đã Xác Nhận"
-        if (status === "Đã Xác Nhận") {
-          // Gửi email thông báo
-          await this.sendConfirmationEmail();
+        const currentStatus = this.borrowBook.status;
+        const newStatus = event.target.value;
+
+        if (this.canChangeStatus(currentStatus, newStatus)) {
+          this.borrowBook.status = newStatus;
+          await borrowBookService.updateStatus(id, { status: newStatus });
+
+          if (newStatus === "Đã Xác Nhận") {
+            await this.sendConfirmationEmail();
+          }
+        } else {
+          this.openPopup("Không thể thay đổi trạng thái này.");
         }
-
-        // Thông báo sau khi cập nhật trạng thái thành công
       } catch (error) {
         console.error("Lỗi khi cập nhật trạng thái:", error);
       }
     },
-
     async sendConfirmationEmail() {
       try {
         const emailData = {
           to: this.reader.email,
           subject: "Thông báo xác nhận mượn sách",
           text: `
-        Chào ${this.reader.username},
-        
-        Chúng tôi xin thông báo rằng yêu cầu mượn sách của bạn đã được xác nhận. 
-        Bạn có thể đến nhận sách tại thư viện vào ngày ${this.formattedDate(
-          this.borrowBook.dateOfBorrow
-        )}.
+            Chào ${this.reader.username},
 
-        Trân trọng,
-        Thư viện của chúng tôi
-      `,
+            Chúng tôi xin thông báo rằng yêu cầu mượn sách của bạn đã được xác nhận.
+            Bạn có thể đến nhận sách tại thư viện vào ngày ${this.formattedDate(
+              this.borrowBook.dateOfBorrow
+            )}.
+
+            Trân trọng,
+            Thư viện của chúng tôi
+          `,
         };
-
-        // Gọi service gửi email
         await emailService.sendEmail(
           emailData.to,
           emailData.subject,
@@ -165,6 +193,16 @@ export default {
         console.error("Lỗi khi gửi email:", error);
       }
     },
+
+    openPopup(message) {
+      this.popupMessage = message;
+      this.showPopup = true;
+    },
+
+    closePopup() {
+      this.showPopup = false;
+    },
+
     formattedDate(date) {
       return new Date(date).toLocaleDateString("vi-VN");
     },
@@ -202,5 +240,10 @@ export default {
   max-width: 100%;
   height: 400px;
   margin-top: 1rem;
+}
+.choser {
+  width: 60%;
+  padding: 5px;
+  text-align: center;
 }
 </style>

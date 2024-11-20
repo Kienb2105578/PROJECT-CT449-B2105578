@@ -3,6 +3,7 @@ const express = require("express");
 const {
   getAll,
   getById,
+  getByUserAndBookId,
   add,
   update,
   delete: deleteBorrowBook,
@@ -13,6 +14,7 @@ const router = express.Router();
 
 router.get("/", getAll);
 router.get("/:id", getById);
+router.get("/:id", getByUserAndBookId);
 
 router.post("/create", add);
 router.put("/:id", update);

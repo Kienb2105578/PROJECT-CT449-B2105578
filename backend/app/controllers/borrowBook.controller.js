@@ -29,6 +29,36 @@ exports.getById = async (req, res, next) => {
     );
   }
 };
+exports.getByUserAndBookId = async (req, res, next) => {
+  try {
+    const borrowBookService = new BorrowBookService(MongoDB.client);
+
+    const { reader_id, book_id } = req.query; // Lấy reader_id và book_id từ query string
+    if (!reader_id || !book_id) {
+      return next(new ApiError(400, "reader_id and book_id are required"));
+    }
+
+    // Lấy tất cả các bản ghi mượn sách của người dùng cho cuốn sách cụ thể
+    const documents = await borrowBookService.getByUserAndBookId(
+      reader_id,
+      book_id
+    );
+
+    // Nếu không có mượn sách nào, trả về mảng trống
+    if (!documents || documents.length === 0) {
+      return res.status(404).send({ message: "Borrowed books not found" });
+    }
+
+    return res.send(documents); // Trả về mảng các sách đã mượn
+  } catch (error) {
+    return next(
+      new ApiError(
+        500,
+        `Error retrieving borrow books with reader_id and book_id`
+      )
+    );
+  }
+};
 
 exports.delete = async (req, res, next) => {
   try {

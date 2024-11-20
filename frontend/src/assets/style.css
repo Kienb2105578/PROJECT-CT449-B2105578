@@ -115,9 +115,9 @@ body #app {
   flex: 1;
 }
 .add-button {
-  width: 20%;
+  width: 40%;
   border-radius: 20px;
-  border: 2px solid #007bff;
+  border: 1px solid #007bff;
 }
 .title-admin {
   color: #007bff;

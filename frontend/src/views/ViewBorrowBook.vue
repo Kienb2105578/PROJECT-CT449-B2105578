@@ -28,11 +28,11 @@
               </p>
               <p style="font-weight: bold">
                 <strong>Trạng thái: </strong>
-                <span :class="getStatusClass(selectedBook)">
-                  {{ selectedBook.status }}
-                </span>
-                <span v-if="isOverdue(selectedBook)" class="text-danger">
-                  (Trễ hạn)</span
+                <span :class="getStatusClass(selectedBook)">{{
+                  selectedBook.status
+                }}</span>
+                <span v-if="isOverdue(selectedBook)" class="text-danger"
+                  >(Trễ hạn)</span
                 >
               </p>
             </div>
@@ -42,8 +42,7 @@
               </p>
               <p><strong>Email:</strong> {{ selectedBook.reader.email }}</p>
               <p>
-                <strong>Số điện thoại:</strong>
-                {{ selectedBook.reader.phone }}
+                <strong>Số điện thoại:</strong> {{ selectedBook.reader.phone }}
               </p>
             </div>
           </div>
@@ -79,7 +78,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(item, index) in borrowBook" :key="item._id">
+          <tr v-for="(item, index) in paginatedBooks" :key="item._id">
             <td>{{ index + 1 }}</td>
             <td @click="showBookDetails(item)" class="book-name">
               {{ item.book.name }}
@@ -99,9 +98,42 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Phân trang -->
+    <div class="d-flex justify-content-center mb-5">
+      <nav>
+        <ul class="pagination">
+          <li class="page-item" :class="{ disabled: currentPage === 1 }">
+            <a class="page-link" href="#" @click="changePage(currentPage - 1)"
+              >&laquo;</a
+            >
+          </li>
+          <li
+            class="page-item"
+            v-for="page in totalPages"
+            :key="page"
+            :class="{ active: page === currentPage }"
+          >
+            <a class="page-link" href="#" @click="changePage(page)">{{
+              page
+            }}</a>
+          </li>
+          <li
+            class="page-item"
+            :class="{ disabled: currentPage === totalPages }"
+          >
+            <a class="page-link" href="#" @click="changePage(currentPage + 1)"
+              >&raquo;</a
+            >
+          </li>
+        </ul>
+      </nav>
+    </div>
+
     <Footer></Footer>
   </div>
 </template>
+
 <script>
 import Nav from "../components/userComponents/NavUser.vue";
 import borrowBookService from "../services/borrowBook.service";
@@ -116,26 +148,47 @@ export default {
     return {
       borrowBook: [],
       selectedBook: null,
+      currentPage: 1,
+      itemsPerPage: 5,
     };
   },
+  computed: {
+    // Lấy mục được phân trang
+    paginatedBooks() {
+      const start = (this.currentPage - 1) * this.itemsPerPage;
+      const end = this.currentPage * this.itemsPerPage;
+      return this.borrowBook.slice(start, end);
+    },
+    totalPages() {
+      return Math.ceil(this.borrowBook.length / this.itemsPerPage);
+    },
+  },
   methods: {
+    // Lấy tất cả sách mượn
     async getAll() {
       try {
         const user_id = JSON.parse(localStorage.getItem("user"))._id;
         const query = { user_id };
         const params = new URLSearchParams(query);
         const queryString = params.toString();
-        this.borrowBook = await borrowBookService.getAll(queryString);
+        const response = await borrowBookService.getAll(queryString);
+
+        this.borrowBook = response.sort(
+          (a, b) => new Date(b.dateOfBorrow) - new Date(a.dateOfBorrow)
+        );
       } catch (error) {
         console.log(error);
       }
     },
+    // Hiển thị chi tiết sách
     showBookDetails(item) {
       this.selectedBook = item;
     },
+    // Định dạng ngày
     formatDate(date) {
       return new Date(date).toISOString().slice(0, 10);
     },
+    // Lấy lớp trạng thái
     getStatusClass(item) {
       if (item.status === "Đang Mượn" && this.isOverdue(item)) {
         return "text-danger";
@@ -151,21 +204,34 @@ export default {
       }
       return "";
     },
+    // Kiểm tra nếu quá hạn
     isOverdue(item) {
       const currentDate = new Date();
       const returnDate = new Date(item.dateOfReturn);
       return item.status === "Đang Mượn" && currentDate > returnDate;
     },
+    // Hiển thị nút hủy
     showCancelButton(item) {
       return item.status === "Chờ Xác Nhận" || item.status === "Đã Xác Nhận";
     },
+    // Hủy mượn sách
     async cancelBorrow(item) {
       try {
         await borrowBookService.updateStatus(item._id, { status: "Đã Hủy" });
-        this.getAll();
+        // Cập nhật trực tiếp danh sách mà không gọi lại API
+        const index = this.borrowBook.findIndex((b) => b._id === item._id);
+        if (index !== -1) {
+          this.borrowBook[index].status = "Đã Hủy";
+        }
+        this.selectedBook = null;
       } catch (error) {
         console.log("Hủy mượn thất bại:", error);
       }
+    },
+
+    // Thay đổi trang
+    changePage(page) {
+      this.currentPage = page;
     },
   },
   mounted() {
@@ -173,6 +239,7 @@ export default {
   },
 };
 </script>
+
 <style scoped>
 .table {
   width: 100%;

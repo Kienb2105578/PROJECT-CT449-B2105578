@@ -49,6 +49,13 @@ class BorrowBookService {
     });
     return data;
   }
+  async getByUserAndBookId(reader_id, book_id) {
+    const data = await this.col.findOne({
+      reader_id: new ObjectId(reader_id), // Chuyển user_id sang ObjectId nếu cần
+      book_id: new ObjectId(book_id), // Chuyển book_id sang ObjectId nếu cần
+    });
+    return data;
+  }
 
   async delete(id) {
     const data = await this.col.findOneAndDelete({
@@ -79,14 +86,12 @@ class BorrowBookService {
   // }
 
   async updateStatus(id, status) {
-    // Lấy yêu cầu mượn sách
     const borrowBook = await this.col.findOne({ _id: new ObjectId(id) });
 
     if (!borrowBook) {
       throw new Error("Không tìm thấy yêu cầu mượn sách.");
     }
 
-    // Lấy sách tương ứng với book_id trong yêu cầu mượn
     const book = await this.booksCol.findOne({
       _id: new ObjectId(borrowBook.book_id),
     });
@@ -95,18 +100,21 @@ class BorrowBookService {
       throw new Error("Không tìm thấy sách.");
     }
 
-    // Kiểm tra số lượng sách
     let updatedQuantity;
+
     if (status === "Đang Mượn") {
       updatedQuantity = Number(book.quantity) - 1;
       if (updatedQuantity < 0) {
         throw new Error("Số lượng sách không đủ để mượn.");
       }
-    } else if (status === "Đã Trả" || status === "Đã Hủy") {
+    }
+    if (status === "Đã Trả" || status === "Đã Hủy") {
       updatedQuantity = Number(book.quantity) + 1;
     }
 
-    // Cập nhật số lượng sách
+    console.log("Book info before update:", book);
+    console.log("Updated quantity:", updatedQuantity);
+
     const bookUpdateResult = await this.booksCol.updateOne(
       { _id: new ObjectId(borrowBook.book_id) },
       { $set: { quantity: updatedQuantity.toString() } }
@@ -116,7 +124,6 @@ class BorrowBookService {
       throw new Error("Không thể cập nhật số lượng sách.");
     }
 
-    // Cập nhật trạng thái của yêu cầu mượn sách
     const result = await this.col.findOneAndUpdate(
       { _id: new ObjectId(id) },
       { $set: { status } },
@@ -160,31 +167,39 @@ class BorrowBookService {
   // }
   async add(data) {
     try {
-      const borrowBook = await this.col.findOne({
+      // Kiểm tra xem sách đã được mượn bởi người dùng này chưa, với trạng thái hợp lệ
+      const existingBorrow = await this.col.findOne({
         book_id: new ObjectId(data.book_id),
         reader_id: new ObjectId(data.reader_id),
+        status: { $nin: ["Đã Trả", "Đã Hủy"] }, // Kiểm tra trạng thái không phải là "Đã Trả" hoặc "Đã Hủy"
       });
 
-      if (borrowBook) {
-        return "Book already borrowed by this user";
+      if (existingBorrow) {
+        return {
+          error: true,
+          message:
+            "Book already borrowed by this user and is not returned or canceled yet.",
+        };
       }
 
+      // Kiểm tra số lượng sách còn lại
       const book = await this.booksCol.findOne({
         _id: new ObjectId(data.book_id),
       });
       if (book && Number(book.quantity) > 0) {
         const updatedQuantity = Number(book.quantity) - 1;
 
+        // Cập nhật số lượng sách
         const bookUpdateResult = await this.booksCol.updateOne(
           { _id: new ObjectId(data.book_id) },
           { $set: { quantity: updatedQuantity.toString() } }
         );
 
         if (bookUpdateResult.modifiedCount === 0) {
-          return "Unable to update book quantity";
+          return { error: true, message: "Unable to update book quantity" };
         }
       } else {
-        return "This book is currently unavailable";
+        return { error: true, message: "This book is currently unavailable" };
       }
 
       // Thêm yêu cầu mượn sách
@@ -192,12 +207,21 @@ class BorrowBookService {
         ...data,
         book_id: new ObjectId(data.book_id),
         reader_id: new ObjectId(data.reader_id),
+        status: "Chờ Xác Nhận", // Trạng thái khi mượn sách
       });
 
-      return result;
+      if (!result.acknowledged) {
+        return { error: true, message: "Failed to borrow the book" };
+      }
+
+      return {
+        success: true,
+        message: "Book borrowed successfully",
+        data: result,
+      };
     } catch (error) {
       console.error("Error in add method:", error);
-      throw error;
+      return { error: true, message: "An error occurred, please try again." };
     }
   }
 }
